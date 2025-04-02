@@ -277,7 +277,8 @@ class Diarizer:
             cluster_labels = self.cluster(
                 embeds,
                 n_clusters=num_speakers,
-                threshold=threshold
+                threshold=threshold,
+                *args, **kwargs
             )
         else:
             cluster_labels = self.cluster(

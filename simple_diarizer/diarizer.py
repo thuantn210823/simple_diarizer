@@ -110,7 +110,7 @@ class Diarizer:
             for i, j in segments:
                 signal_seg = signal[:, i:j]
                 if self.embed_model_type == 'ecapa_tao':
-                    seg_embed = self.embed_model(signal_seg, None)
+                    seg_embed = self.embed_model(signal_seg.to(self.run_opts['device']), None)
                 else:
                     seg_embed = self.embed_model.encode_batch(signal_seg)
                 embeds.append(seg_embed.squeeze(0).squeeze(0).cpu().numpy())

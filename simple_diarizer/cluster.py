@@ -5,7 +5,7 @@ from scipy.sparse.csgraph import laplacian
 from scipy.ndimage import gaussian_filter
 from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
 from sklearn.metrics import pairwise_distances
-
+from speechbrain.processing import diarization as diar
 
 def similarity_matrix(embeds, metric="cosine"):
     return pairwise_distances(embeds, metric=metric)
@@ -37,6 +37,11 @@ def cluster_AHC(embeds, n_clusters=None, threshold=None, metric="cosine", **kwar
 
         return cluster_model.fit_predict(S)
 
+
+def cluster_SC_sb(embeds, n_clusters = None, threshold = 0.3, *args, **kwargs):
+    clust = diar.Spec_Clust_unorm(*args, **kwargs)
+    clust.do_spec_clust(embeds, k_oracle = n_clusters, p_val = threshold)
+    return clust.labels_
 
 ##########################################
 # Spectral clustering

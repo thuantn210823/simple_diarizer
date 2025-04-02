@@ -6,51 +6,65 @@ import numpy as np
 import pandas as pd
 import torch
 import torchaudio
-from speechbrain.pretrained import EncoderClassifier
+from speechbrain.inference import EncoderClassifier
 from tqdm.autonotebook import tqdm
 
-from .cluster import cluster_AHC, cluster_SC
+from .cluster import cluster_AHC, cluster_SC, cluster_SC_sb
 from .utils import check_wav_16khz_mono, convert_wavfile
-
+from .model.ECAPA_TDNN import ECAPA_TDNN
 
 class Diarizer:
     def __init__(
-        self, embed_model="xvec", cluster_method="sc", window=1.5, period=0.75
+        self, embed_model="xvec_sb", cluster_method="sc", window=1.5, period=0.75
     ):
 
         assert embed_model in [
-            "xvec",
-            "ecapa",
-        ], "Only xvec and ecapa are supported options"
+            "xvec_sb",
+            "ecapa_sb",
+            "ecapa_tao"
+        ], "Only xvec_sb, ecapa_sb and ecapa_tao are supported options"
         assert cluster_method in [
             "ahc",
             "sc",
-        ], "Only ahc and sc in the supported clustering options"
+            "sc_sb"
+            ""
+        ], "Only ahc, sc and sc_sb in the supported clustering options"
 
         if cluster_method == "ahc":
             self.cluster = cluster_AHC
         if cluster_method == "sc":
             self.cluster = cluster_SC
+        if cluster_method == 'sc_sb':
+            self.cluster = cluster_SC_sb
 
         self.vad_model, self.get_speech_ts = self.setup_VAD()
 
         self.run_opts = (
             {"device": "cuda:0"} if torch.cuda.is_available() else {"device": "cpu"}
         )
-
-        if embed_model == "xvec":
+    
+        if embed_model == "xvec_sb":
             self.embed_model = EncoderClassifier.from_hparams(
                 source="speechbrain/spkrec-xvect-voxceleb",
                 savedir="pretrained_models/spkrec-xvect-voxceleb",
                 run_opts=self.run_opts,
             )
-        if embed_model == "ecapa":
+        if embed_model == "ecapa_sb":
             self.embed_model = EncoderClassifier.from_hparams(
                 source="speechbrain/spkrec-ecapa-voxceleb",
                 savedir="pretrained_models/spkrec-ecapa-voxceleb",
                 run_opts=self.run_opts,
             )
+        if embed_model == "ecapa_tao":
+            self.embed_model = ECAPA_TDNN(1024).to(self.run_opts['device'])
+            state_dict = torch.load("pretrained/ECAPA_TDNN_tao.pt", 
+                              weights_only = True,
+                              map_location = self.run_opts['device'])
+            self.embed_model.load_state_dict(state_dict)
+            self.embed_model.eval()
 
+        self.cluster_method = cluster_method
+        self.embed_model_type = embed_model
         self.window = window
         self.period = period
 
@@ -95,7 +109,10 @@ class Diarizer:
         with torch.no_grad():
             for i, j in segments:
                 signal_seg = signal[:, i:j]
-                seg_embed = self.embed_model.encode_batch(signal_seg)
+                if self.embed_model_type == 'ecapa_tao':
+                    seg_embed = self.embed_model(signal_seg, None)
+                else:
+                    seg_embed = self.embed_model.encode_batch(signal_seg)
                 embeds.append(seg_embed.squeeze(0).squeeze(0).cpu().numpy())
 
         embeds = np.array(embeds)
@@ -181,12 +198,13 @@ class Diarizer:
     def diarize(
         self,
         wav_file,
-        num_speakers=2,
-        threshold=None,
+        num_speakers=None,
+        threshold=0.3,
         silence_tolerance=0.2,
         enhance_sim=True,
         extra_info=False,
         outfile=None,
+        *args, **kwargs
     ):
         """
         Diarize a 16khz mono wav file, produces list of segments
@@ -255,12 +273,19 @@ class Diarizer:
         embeds, segments = self.recording_embeds(signal, fs, speech_ts)
 
         print("Clustering to {} speakers...".format(num_speakers))
-        cluster_labels = self.cluster(
-            embeds,
-            n_clusters=num_speakers,
-            threshold=threshold,
-            enhance_sim=enhance_sim,
-        )
+        if self.cluster_method == 'sc_sb':
+            cluster_labels = self.cluster(
+                embeds,
+                n_clusters=num_speakers,
+                threshold=threshold
+            )
+        else:
+            cluster_labels = self.cluster(
+                embeds,
+                n_clusters=num_speakers,
+                threshold=threshold,
+                enhance_sim=enhance_sim
+            )
 
         print("Cleaning up output...")
         cleaned_segments = self.join_segments(cluster_labels, segments)

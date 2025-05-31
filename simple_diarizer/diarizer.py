@@ -42,8 +42,6 @@ class Diarizer:
         if cluster_method == 'sc_sb':
             self.cluster = cluster_SC_sb
 
-        self.vad_model, self.get_speech_ts = self.setup_VAD(vad_model)
-
         self.run_opts = (
             {"device": "cuda:0"} if torch.cuda.is_available() else {"device": "cpu"}
         )
@@ -67,6 +65,8 @@ class Diarizer:
                               map_location = self.run_opts['device'])
             self.embed_model.load_state_dict(state_dict)
             self.embed_model.eval()
+            
+        self.vad_model, self.get_speech_ts = self.setup_VAD(vad_model)
 
         self.cluster_method = cluster_method
         self.embed_model_type = embed_model

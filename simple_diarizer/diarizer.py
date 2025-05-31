@@ -24,7 +24,7 @@ class Diarizer:
             "ecapa_sb",
             "ecapa_tao"
         ], "Only xvec_sb, ecapa_sb and ecapa_tao are supported options"
-        assert embed_model in [
+        assert vad_model in [
             "crdnn",
             "silero",
         ], "Only crdnn, silero are supported options"
@@ -70,6 +70,7 @@ class Diarizer:
 
         self.cluster_method = cluster_method
         self.embed_model_type = embed_model
+        self.vad_model_type = vad_model
         self.window = window
         self.period = period
 
@@ -95,7 +96,7 @@ class Diarizer:
         return self.get_speech_ts(signal, self.vad_model)
     
     def crdnn_vad(self, filepath, sr):
-        boundaries = self.model.get_speech_segments(filepath)
+        boundaries = self.vad_model.get_speech_segments(filepath)
         speech_ts = []
         for bdr in boundaries:
             start, end = bdr
@@ -285,9 +286,9 @@ class Diarizer:
             signal, fs = torchaudio.load(converted_wavfile)
 
         print("Running VAD...")
-        if self.vad_model == 'silero':
+        if self.vad_model_type == 'silero':
             speech_ts = self.silero_vad(signal[0])
-        if self.vad_model == 'crdnn':
+        if self.vad_model_type == 'crdnn':
             speech_ts = self.crdnn_vad(wav_file, fs)
         print("Splitting by silence found {} utterances".format(len(speech_ts)))
         assert len(speech_ts) >= 1, "Couldn't find any speech during VAD"

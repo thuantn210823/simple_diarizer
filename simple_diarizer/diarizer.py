@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 import torchaudio
 from speechbrain.inference import EncoderClassifier
+from speechbrain.inference.VAD import VAD
 from tqdm.autonotebook import tqdm
 
 from .cluster import cluster_AHC, cluster_SC, cluster_SC_sb
@@ -15,7 +16,7 @@ from .model.ECAPA_TDNN import ECAPA_TDNN
 
 class Diarizer:
     def __init__(
-        self, embed_model="xvec_sb", cluster_method="sc", window=1.5, period=0.75
+        self, embed_model="xvec_sb", vad_model='crdnn', cluster_method="sc", window=1.5, period=0.75
     ):
 
         assert embed_model in [
@@ -23,6 +24,10 @@ class Diarizer:
             "ecapa_sb",
             "ecapa_tao"
         ], "Only xvec_sb, ecapa_sb and ecapa_tao are supported options"
+        assert embed_model in [
+            "crdnn",
+            "silero",
+        ], "Only crdnn, silero are supported options"
         assert cluster_method in [
             "ahc",
             "sc",
@@ -37,7 +42,7 @@ class Diarizer:
         if cluster_method == 'sc_sb':
             self.cluster = cluster_SC_sb
 
-        self.vad_model, self.get_speech_ts = self.setup_VAD()
+        self.vad_model, self.get_speech_ts = self.setup_VAD(vad_model)
 
         self.run_opts = (
             {"device": "cuda:0"} if torch.cuda.is_available() else {"device": "cpu"}
@@ -68,20 +73,35 @@ class Diarizer:
         self.window = window
         self.period = period
 
-    def setup_VAD(self):
-        model, utils = torch.hub.load(
+    def setup_VAD(self, vad_model):
+        if vad_model == 'silero':
+            model, utils = torch.hub.load(
             repo_or_dir="snakers4/silero-vad", model="silero_vad"
-        )
-        # force_reload=True)
+            )
+            # force_reload=True)
 
-        get_speech_ts = utils[0]
-        return model, get_speech_ts
+            get_speech_ts = utils[0]
+            return model, get_speech_ts
+        if vad_model == 'crdnn':
+            model = VAD.from_hparams(source="speechbrain/vad-crdnn-libriparty", 
+                                     savedir="pretrained_models/vad-crdnn-libriparty",
+                                     run_opts = self.run_opts)
+            return model, None
 
-    def vad(self, signal):
+    def silero_vad(self, signal):
         """
         Runs the VAD model on the signal
         """
         return self.get_speech_ts(signal, self.vad_model)
+    
+    def crdnn_vad(self, filepath, sr):
+        boundaries = self.model.get_speech_segments(filepath)
+        speech_ts = []
+        for bdr in boundaries:
+            start, end = bdr
+            speech_ts.append({"start": int(start.item()*sr),
+                              "end": int(end.item()*sr)})
+        return speech_ts
 
     def windowed_embeds(self, signal, fs, window=1.5, period=0.75):
         """
@@ -265,7 +285,10 @@ class Diarizer:
             signal, fs = torchaudio.load(converted_wavfile)
 
         print("Running VAD...")
-        speech_ts = self.vad(signal[0])
+        if self.vad_model == 'silero':
+            speech_ts = self.silero_vad(signal[0])
+        if self.vad_model == 'crdnn':
+            speech_ts = self.crdnn_vad(wav_file, fs)
         print("Splitting by silence found {} utterances".format(len(speech_ts)))
         assert len(speech_ts) >= 1, "Couldn't find any speech during VAD"
 

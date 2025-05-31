@@ -65,7 +65,7 @@ class Diarizer:
                               map_location = self.run_opts['device'])
             self.embed_model.load_state_dict(state_dict)
             self.embed_model.eval()
-            
+
         self.vad_model, self.get_speech_ts = self.setup_VAD(vad_model)
 
         self.cluster_method = cluster_method
@@ -96,7 +96,9 @@ class Diarizer:
         return self.get_speech_ts(signal, self.vad_model)
     
     def crdnn_vad(self, filepath, sr):
-        boundaries = self.vad_model.get_speech_segments(filepath)
+        boundaries = self.vad_model.get_speech_segments(filepath,
+                                                        overlap_small_chunk = True,
+                                                        apply_energy_VAD = True)
         speech_ts = []
         for bdr in boundaries:
             start, end = bdr

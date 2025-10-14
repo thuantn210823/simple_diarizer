@@ -16,7 +16,7 @@ from .model.ECAPA_TDNN import ECAPA_TDNN
 
 class Diarizer:
     def __init__(
-        self, embed_model="xvec_sb", vad_model='crdnn', cluster_method="sc", window=1.5, period=0.75
+        self, embed_model="xvec_sb", vad_model='silero', cluster_method="sc", window=1.5, period=0.75
     ):
 
         assert embed_model in [
@@ -77,7 +77,9 @@ class Diarizer:
     def setup_VAD(self, vad_model):
         if vad_model == 'silero':
             model, utils = torch.hub.load(
-            repo_or_dir="snakers4/silero-vad", model="silero_vad"
+            repo_or_dir="simple_diarizer/snakers4_silero-vad_master",
+            model="silero_vad",
+            source="local"   
             )
             # force_reload=True)
 

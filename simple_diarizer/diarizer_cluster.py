@@ -74,6 +74,8 @@ class Diarizer:
         self.vad_model_type = vad_model
         self.window = window
         self.period = period
+        self.merge_cluster = merge_cluster
+        self.cosim_val = cosim_val
 
     def setup_VAD(self, vad_model):
         if vad_model == 'silero':
@@ -345,7 +347,7 @@ class Diarizer:
             )
 
         if self.merge_cluster:
-                cluster_labels = self.merge_clusters(embeds, cluster_labels)
+                cluster_labels = self.merge_clusters(embeds, cluster_labels, self.cosim_val)
 
         print("Cleaning up output...")
         cleaned_segments = self.join_segments(cluster_labels, segments)

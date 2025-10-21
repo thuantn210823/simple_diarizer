@@ -17,7 +17,7 @@ from .model.ECAPA_TDNN import ECAPA_TDNN
 
 class Diarizer:
     def __init__(
-        self, embed_model="xvec_sb", vad_model='silero', cluster_method="sc", windows=[1.5, 2], period=0.75, weights = [0.5, 0.5]
+        self, embed_model="xvec_sb", vad_model='silero', cluster_method="sc", windows=[1.5, 2], period=0.75, weights = [0.5, 0.5], merge_cluster = False
     ):
 
         assert embed_model in [
@@ -77,6 +77,7 @@ class Diarizer:
         self.period = period
         self.weights = torch.tensor(weights, device=self.run_opts['device'])
         self.weights = self.weights/self.weights.sum()
+        self.merge_cluster = merge_cluster
 
     def setup_VAD(self, vad_model):
         if vad_model == 'silero':
@@ -139,8 +140,8 @@ class Diarizer:
                 seg_embeds = []
                 for idx, w in enumerate(windows):
                     len_window_half = int(w*fs)//2
-                    new_i = max(0, i-len_window_half)
-                    new_j = min(len_signal - 1,j+len_window_half)
+                    new_i = max(0, (i+j)//2-len_window_half)
+                    new_j = min(len_signal - 1,(i+j)//2+len_window_half)
                     signal_seg = signal[:, new_i:new_j]
                     if self.embed_model_type == 'ecapa_tao':
                         seg_embed = self.embed_model(signal_seg.to(self.run_opts['device']), None)
@@ -355,8 +356,8 @@ class Diarizer:
                 threshold=threshold,
                 enhance_sim=enhance_sim
             )
-        
-        cluster_labels = self.merge_clusters(embeds, cluster_labels)
+        if self.merge_cluster:
+            cluster_labels = self.merge_clusters(embeds, cluster_labels)
 
         print("Cleaning up output...")
         cleaned_segments = self.join_segments(cluster_labels, segments)

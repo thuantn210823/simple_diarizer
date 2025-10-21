@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 import torch
 import torchaudio
 from speechbrain.inference import EncoderClassifier
@@ -217,6 +218,35 @@ class Diarizer:
                 new_segments.append(protoseg)
 
         return new_segments
+    
+    @staticmethod
+    def merge_clusters(embeds, cluster_labels, sim_threshold=0.9):
+        # Lấy danh sách các cụm
+        unique_clusters = np.unique(cluster_labels)
+        centroids = []
+
+        for c in unique_clusters:
+            c_embeds = embeds[cluster_labels == c]
+            centroid = np.mean(c_embeds, axis=0)
+            centroids.append(centroid)
+        centroids = np.vstack(centroids)
+
+        sim_matrix = cosine_similarity(centroids)
+
+        merged_labels = cluster_labels.copy()
+        merge_map = {}
+
+        for i in range(len(unique_clusters)):
+            for j in range(i + 1, len(unique_clusters)):
+                if sim_matrix[i, j] > sim_threshold:
+                    ci, cj = unique_clusters[i], unique_clusters[j]
+                    merge_map[cj] = ci
+
+        for cj, ci in merge_map.items():
+            merged_labels[merged_labels == cj] = ci
+
+        _, new_labels = np.unique(merged_labels, return_inverse=True)
+        return new_labels
 
     @staticmethod
     def make_output_seconds(cleaned_segments, fs):
@@ -325,6 +355,8 @@ class Diarizer:
                 threshold=threshold,
                 enhance_sim=enhance_sim
             )
+        
+        cluster_labels = self.merge_clusters(embeds, cluster_labels)
 
         print("Cleaning up output...")
         cleaned_segments = self.join_segments(cluster_labels, segments)

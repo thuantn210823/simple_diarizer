@@ -307,7 +307,7 @@ class Diarizer:
         recname = os.path.splitext(os.path.basename(wav_file))[0]
 
         signal, fs = torchaudio.load(wav_file)
-        if not check_wav_16khz_mono(wav_file):
+        if signal.shape[0] != 1:
             print("Found multi-channel audio... Using mix signals instead...")
             signal = signal.mean(dim = 0, keepdim=True)
 

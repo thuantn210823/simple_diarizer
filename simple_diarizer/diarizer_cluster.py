@@ -306,18 +306,10 @@ class Diarizer:
         """
         recname = os.path.splitext(os.path.basename(wav_file))[0]
 
-        if check_wav_16khz_mono(wav_file):
-            signal, fs = torchaudio.load(wav_file)
-        else:
-            print("Converting audio file to single channel WAV using ffmpeg...")
-            converted_wavfile = os.path.join(
-                os.path.dirname(wav_file), "{}_converted.wav".format(recname)
-            )
-            convert_wavfile(wav_file, converted_wavfile)
-            assert os.path.isfile(
-                converted_wavfile
-            ), "Couldn't find converted wav file, failed for some reason"
-            signal, fs = torchaudio.load(converted_wavfile)
+        signal, fs = torchaudio.load(wav_file)
+        if not check_wav_16khz_mono(wav_file):
+            print("Found multi-channel audio... Using mix signals instead...")
+            signal = signal.mean(dim = 0)
 
         print("Running VAD...")
         if self.vad_model_type == 'silero':

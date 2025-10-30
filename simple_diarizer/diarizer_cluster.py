@@ -309,7 +309,7 @@ class Diarizer:
         signal, fs = torchaudio.load(wav_file)
         if not check_wav_16khz_mono(wav_file):
             print("Found multi-channel audio... Using mix signals instead...")
-            signal = signal.mean(dim = 0)
+            signal = signal.mean(dim = 0, keepdim=True)
 
         print("Running VAD...")
         if self.vad_model_type == 'silero':

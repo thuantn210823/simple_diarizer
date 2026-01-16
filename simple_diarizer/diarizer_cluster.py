@@ -94,11 +94,11 @@ class Diarizer:
                                      run_opts = self.run_opts)
             return model, None
 
-    def silero_vad(self, signal):
+    def silero_vad(self, signal, *args, **kwargs):
         """
         Runs the VAD model on the signal
         """
-        return self.get_speech_ts(signal, self.vad_model)
+        return self.get_speech_ts(signal, self.vad_model, *args, **kwargs)
     
     def crdnn_vad(self, filepath, sr):
         boundaries = self.vad_model.get_speech_segments(filepath)
@@ -313,9 +313,9 @@ class Diarizer:
 
         print("Running VAD...")
         if self.vad_model_type == 'silero':
-            speech_ts = self.silero_vad(signal[0])
+            speech_ts = self.silero_vad(signal[0], *args, **kwargs)
         if self.vad_model_type == 'crdnn':
-            speech_ts = self.crdnn_vad(wav_file, fs)
+            speech_ts = self.crdnn_vad(wav_file, fs, *args, **kwargs)
         print("Splitting by silence found {} utterances".format(len(speech_ts)))
         assert len(speech_ts) >= 1, "Couldn't find any speech during VAD"
 

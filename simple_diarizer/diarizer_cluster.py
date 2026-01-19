@@ -14,6 +14,7 @@ from tqdm.autonotebook import tqdm
 from .cluster import cluster_AHC, cluster_SC, cluster_SC_sb
 from .utils import check_wav_16khz_mono, convert_wavfile
 from .model.ECAPA_TDNN import ECAPA_TDNN
+from huggingface_hub import hf_hub_download
 
 class Diarizer:
     def __init__(
@@ -23,7 +24,8 @@ class Diarizer:
         assert embed_model in [
             "xvec_sb",
             "ecapa_sb",
-            "ecapa_tao"
+            "ecapa_tao",
+            "ecapa2"
         ], "Only xvec_sb, ecapa_sb and ecapa_tao are supported options"
         assert vad_model in [
             "crdnn",
@@ -66,7 +68,12 @@ class Diarizer:
                               map_location = self.run_opts['device'])
             self.embed_model.load_state_dict(state_dict)
             self.embed_model.eval()
-            
+        if embed_model == 'ecapa2':
+            # automatically checks for cached file, optionally set `cache_dir` location
+            model_file = hf_hub_download(repo_id='Jenthe/ECAPA2', filename='ecapa2.pt', cache_dir=None)
+            ecapa2 = torch.jit.load(model_file, map_location=self.run_opts['device'])
+            self.embed_model = ecapa2
+            self.embed_model.eval()            
         self.vad_model, self.get_speech_ts = self.setup_VAD(vad_model)
 
         self.cluster_method = cluster_method
